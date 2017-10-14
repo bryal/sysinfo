@@ -10,7 +10,7 @@ import Data.String.Utils (strip)
 type Processor = Map.Map String String
 
 parseProcessorProp :: String -> (String, String)
-parseProcessorProp l = let (key, val) = (splitOn ":" l)
+parseProcessorProp l = let [key, val] = (splitOn ":" l)
                        in (strip key, strip val)
 
 parseProcessor :: String -> Processor
