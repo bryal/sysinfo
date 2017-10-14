@@ -9,24 +9,22 @@ import Data.String.Utils (strip)
 
 type Processor = Map.Map String String
 
-parseProcessorProp :: String -> Maybe (String, String)
-parseProcessorProp l = let r = (splitOn ": " l)
-                       in if (length r) == 2
-                          then Just (strip (r !! 0), strip (r !! 1))
-                          else Nothing
+parseProcessorProp :: String -> (String, String)
+parseProcessorProp l = let (key, val) = (splitOn ":" l)
+                       in (strip key, strip val)
 
 parseProcessor :: String -> Processor
-parseProcessor s = Map.fromList (catMaybes (map parseProcessorProp (lines s)))
+parseProcessor = Map.fromList . map parseProcessorProp . lines
 
 parseProcessors :: String -> [Processor]
-parseProcessors s = map parseProcessor (init (splitOn "\n\n" s))
+parseProcessors = map parseProcessor . init . splitOn "\n\n"
 
 prettyPhysical p = let props = ["physical id", "model name", "cpu cores", "siblings"]
-                       vals = catMaybes (map (\key -> Map.lookup key p) props)
-                       id = vals !! 0
-                       (cores, threads) = ((vals !! 2), (vals !! 3))
-                   in "cpu " ++ id ++ ": " ++ (vals !! 1) ++ "\n" ++
+                       [id, model, cores, threads] = catMaybes (map (\key -> Map.lookup key p) props)
+                   in "cpu " ++ id ++ ": " ++ model ++ "\n" ++
                       (replicate (length id + 6) ' ') ++ cores ++ " cores, " ++ threads ++ " threads"
+
+takeWhileJust = catMaybes . takeWhile isJust
 
 -- Takes the contents of "/proc/cpuinfo", extracts the intresting parts, and returns a prettier
 -- and more printable string containing the most interesting parts of the "cpuinfo"
@@ -37,11 +35,8 @@ prettyCpuinfo s = let processors = (parseProcessors s)
                       threads = show (countThreads physicalCpus)
                   in unlines ((map prettyPhysical physicalCpus) ++
                               ["total: " ++ cores ++ " cores, " ++ threads ++ " threads" ])
-  where uniquePhysicalCpus ps =
-          catMaybes (takeWhile isJust
-                               (map (\id -> find ((== Just (show id)) . (Map.lookup "physical id"))
-                                            ps)
-                                    [0..]))
+  where uniquePhysicalCpus ps = takeWhileJust (map (\id -> find (hasPhysicalId id) ps) [0..])
+        hasPhysicalId id = (== Just (show id)) . (Map.lookup "physical id")
         countNums :: String -> [Processor] -> Int
         countNums key cpus = sum (map (read . fromJust . (Map.lookup key)) cpus)
         countCores = countNums "cpu cores"
